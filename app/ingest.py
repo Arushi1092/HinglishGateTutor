@@ -1,6 +1,7 @@
 import fitz  # PyMuPDF
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
+from app.retriever import build_bm25_index
 from qdrant_client.models import Distance, VectorParams, PointStruct
 import uuid, os
 
@@ -38,6 +39,8 @@ def create_collection():  # deletes the old data each run
 def ingest_pdf(pdf_path: str, source_name: str):
     text = extract_text(pdf_path)
     chunks = chunk_text(text)
+    chunk_dicts = [{"text": c, "source": source_name} for c in chunks] #converts chunks to structured data
+    build_bm25_index(chunk_dicts) #Take all chunks → tokenize → build keyword index  bm25=keyword based search
     embeddings = embedder.encode(chunks, show_progress_bar=True)
     points = [
         PointStruct(
