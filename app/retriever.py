@@ -1,43 +1,5 @@
-"""
-Evaluation: Dense vs Hybrid Retrieval (BM25 + RRF)
-
-Tested on ~10 queries including:
-- Conceptual questions (e.g., "What is a relation?")
-- Hindi queries (e.g., "गणित में संबंध क्या होता है?")
-- Out-of-domain queries (e.g., "Explain binary search tree")
-
-Findings:
-
-1. Dense retrieval (SentenceTransformer embeddings)
-   - Performs strongly on semantic queries
-   - Correct answers consistently appear in top 2–3 results
-   - Works well for both English and Hindi queries due to multilingual model
-
-2. Hybrid retrieval (Dense + BM25 + RRF)
-   - Slight improvement in ranking stability
-   - Helps when exact keyword matches are important
-   - Did not significantly outperform dense retrieval on this dataset
-     (likely due to small and well-structured NCERT corpus)
-
-3. Multilingual behavior
-   - Hindi queries successfully retrieve relevant English chunks
-   - Confirms effectiveness of multilingual embeddings
-
-4. Limitations observed
-   - Out-of-domain queries return irrelevant results (expected behavior)
-   - Chunk quality impacts ranking more than fusion method
-   - Definitions are not always ranked first due to chunk structure
-
-Conclusion:
-- Dense retrieval is already strong for this use case
-- Hybrid + RRF adds robustness but limited gains on small datasets
-- Final answer quality should be handled by the generator (LLM layer),
-  not over-optimized in retrieval
-
-Next step:
-→ Use top-k retrieved chunks as context for LLM-based answer generation
-"""
 from sentence_transformers import SentenceTransformer
+from sentence_transformers import CrossEncoder
 from qdrant_client import QdrantClient
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
@@ -49,16 +11,13 @@ from rank_bm25 import BM25Okapi
 COLLECTION = "gate_docs"
 EMBED_MODEL = "paraphrase-multilingual-mpnet-base-v2"
 
-# ----------------------------
-# Initialize
-# ----------------------------
-embedder = SentenceTransformer(EMBED_MODEL)
+_reranker = None
 
-# ----------------------------
-# BM25 Globals
-# ----------------------------
-_all_chunks = []
-bm25_index = None
+def get_reranker():
+    global _reranker
+    if _reranker is None:
+        _reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+    return _reranker
 
 # ----------------------------
 # Language Detection
@@ -85,11 +44,61 @@ def prepare_query(user_query: str) -> dict:
     }
 
 # ----------------------------
+# Shared Resources (Singletons)
+# ----------------------------
+_client = None
+_embedder = None
+
+def get_qdrant_client():
+    global _client
+    if _client is None:
+        _client = QdrantClient(path="./qdrant_data")
+    return _client
+
+def get_embedder():
+    global _embedder
+    if _embedder is None:
+        _embedder = SentenceTransformer(EMBED_MODEL)
+    return _embedder
+
+# ----------------------------
+# Initialize (Lazy loading)
+# ----------------------------
+# We will use get_embedder() and get_qdrant_client() inside functions
+
+def get_all_chunks():
+    client = get_qdrant_client()
+    if not client.collection_exists(COLLECTION):
+        return []
+    
+    # Scroll through all points
+    chunks = []
+    next_page = None
+    while True:
+        points, next_page = client.scroll(
+            collection_name=COLLECTION,
+            limit=100,
+            with_payload=True,
+            offset=next_page
+        )
+        for p in points:
+            chunks.append({
+                "text": p.payload.get("text", ""),
+                "source": p.payload.get("source", "unknown")
+            })
+        if next_page is None:
+            break
+    return chunks
+
+# ----------------------------
 # Dense Search
 # ----------------------------
 def dense_search(query: str, top_k: int = 5):
-    client = QdrantClient(path="./qdrant_data")
+    client = get_qdrant_client()
+    if not client.collection_exists(COLLECTION):
+        return []
 
+    embedder = get_embedder()
     query_vec = embedder.encode(query).tolist()
 
     results = client.query_points(
@@ -110,12 +119,20 @@ def dense_search(query: str, top_k: int = 5):
 # ----------------------------
 # BM25 Index Builder
 # ----------------------------
-def build_bm25_index(chunks: list[dict]):
+def build_bm25_index(chunks=None):
     global _all_chunks, bm25_index
 
+    if chunks is None:
+        chunks = get_all_chunks()
+    
     _all_chunks = chunks
-    tokenized = [c["text"].lower().split() for c in chunks]
+    if not _all_chunks:
+        bm25_index = None
+        return None, []
+
+    tokenized = [c["text"].lower().split() for c in _all_chunks]
     bm25_index = BM25Okapi(tokenized)
+    return bm25_index, _all_chunks
 
 # ----------------------------
 # BM25 Search
@@ -124,7 +141,9 @@ def bm25_search(query: str, top_k: int = 10):
     global bm25_index
 
     if bm25_index is None:
-        return []
+        build_bm25_index()
+        if bm25_index is None:
+            return []
 
     scores = bm25_index.get_scores(query.lower().split())
 
@@ -161,6 +180,31 @@ def reciprocal_rank_fusion(dense_results, bm25_results, k=60):
 
     return sorted(scores.values(), key=lambda x: x["rrf"], reverse=True)
 
+
+# We can also add a simple reranking step using a cross-encoder for the top candidates
+def rerank(query: str, candidates: list[dict], top_k: int = 5):
+    if not candidates:
+        return []
+
+    reranker = get_reranker()
+
+    pairs = [(query, c["text"]) for c in candidates]
+    scores = reranker.predict(pairs)
+
+    ranked = sorted(
+        zip(scores, candidates),
+        key=lambda x: x[0],
+        reverse=True
+    )
+
+    return [
+        {
+            **c,
+            "rerank_score": float(score)
+        }
+        for score, c in ranked[:top_k]
+    ]
+
 # ----------------------------
 # Hybrid Search
 # ----------------------------
@@ -172,4 +216,8 @@ def hybrid_search(query: str, top_k: int = 5):
 
     fused = reciprocal_rank_fusion(dense, sparse)
 
-    return fused[:top_k]
+    # take top 20 candidates for reranking
+    candidates = fused[:20]
+
+    # final smart selection
+    return rerank(q_info["original"], candidates, top_k=top_k)
