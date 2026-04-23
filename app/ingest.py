@@ -21,6 +21,8 @@ def chunk_text(text: str) -> list[str]:
         start += CHUNK_SIZE - OVERLAP
     return chunks
 
+from qdrant_client.models import Distance, VectorParams, PointStruct, HnswConfigDiff, ScalarQuantization, ScalarType
+
 def create_collection(force_recreate=False):
     client = get_qdrant_client()
     if client.collection_exists(COLLECTION):
@@ -31,28 +33,63 @@ def create_collection(force_recreate=False):
 
     client.create_collection(
         collection_name=COLLECTION,
-        vectors_config=VectorParams(size=768, distance=Distance.COSINE)
+        vectors_config=VectorParams(size=768, distance=Distance.COSINE),
+        hnsw_config=HnswConfigDiff(m=16, ef_construct=100),
+        quantization_config=ScalarQuantization(
+            scalar=ScalarType.INT8,
+            quantile=0.99,
+            always_ram=True
+        )
     )
 
 def ingest_pdf(pdf_path: str, source_name: str):
+    import torch
     client = get_qdrant_client()
     embedder = get_embedder()
     
+    # 🚀 Move model to GPU if available
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if str(embedder.device) != device:
+        embedder.to(device)
+    
+    print(f"📖 Extracting text from: {source_name}")
     text = extract_text(pdf_path)
     chunks = chunk_text(text)
     
-    embeddings = embedder.encode(chunks, show_progress_bar=True)
-    points = [
-        PointStruct(
-            id=str(uuid.uuid4()),
-            vector=emb.tolist(),
-            payload={"text": chunk, "source": source_name}
+    total_chunks = len(chunks)
+    batch_size = 128  # Faster than processing all at once
+    
+    print(f"📦 Processing {total_chunks} chunks using {device} (Batch Size: {batch_size})")
+
+    all_points = []
+    
+    # Process in batches to save memory and handle large books
+    for i in range(0, total_chunks, batch_size):
+        batch_texts = chunks[i : i + batch_size]
+        
+        # 🧠 Batched embedding generation
+        batch_embeddings = embedder.encode(
+            batch_texts, 
+            batch_size=batch_size, 
+            show_progress_bar=False,
+            convert_to_numpy=True
         )
-        for chunk, emb in zip(chunks, embeddings)
-    ]
-    client.upsert(collection_name=COLLECTION, points=points)
-    print(f"Ingested {len(points)} chunks from {source_name}")
-    return len(points)
+        
+        points = [
+            PointStruct(
+                id=str(uuid.uuid4()),
+                vector=emb.tolist(),
+                payload={"text": chunk, "source": source_name}
+            )
+            for chunk, emb in zip(batch_texts, batch_embeddings)
+        ]
+        
+        # Incremental upsert to Qdrant
+        client.upsert(collection_name=COLLECTION, points=points)
+        print(f"✅ Indexed {min(i + batch_size, total_chunks)}/{total_chunks} chunks...")
+
+    print(f"🎉 Successfully ingested {source_name}")
+    return total_chunks
 
 if __name__ == "__main__":
     create_collection(force_recreate=True)

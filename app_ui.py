@@ -43,19 +43,64 @@ with st.sidebar:
                 files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
                 resp = requests.post(f"{BASE_URL}/ingest", files=files)
                 if resp.status_code == 200:
-                    st.success("Indexing complete!")
-                    time.sleep(1)
-                    st.rerun()
+                    data = resp.json()
+                    if data.get("status") == "already_ingested":
+                        st.info(f"'{uploaded_file.name}' is already in the knowledge base.")
+                    else:
+                        st.success(f"Successfully indexed {data.get('ingested_chunks', 0)} chunks!")
+                        time.sleep(2)
+                        st.rerun()
                 else:
                     st.error(f"Failed: {resp.text}")
             except Exception as e:
                 st.error(f"Error: {str(e)}")
 
     st.divider()
+    
+    # Document Library
+    st.subheader("📚 Your Library")
+    try:
+        sources_resp = requests.get(f"{BASE_URL}/sources")
+        if sources_resp.status_code == 200:
+            sources = sources_resp.json().get("sources", [])
+            if not sources:
+                st.caption("No documents indexed yet.")
+            for src in sources:
+                col1, col2 = st.columns([0.8, 0.2])
+                col1.text(f"📄 {src[:20]}...")
+                if col2.button("🗑️", key=f"del_{src}"):
+                    with st.spinner("Deleting..."):
+                        requests.delete(f"{BASE_URL}/source/{src}")
+                        st.rerun()
+        else:
+            st.error("Failed to load library.")
+    except:
+        st.caption("Connect to backend to see library.")
+
+    st.divider()
+    
+    # Database Management
+    st.subheader("⚙️ Management")
     if st.button("Clear Chat History"):
         st.session_state.messages = []
         st.session_state.history = []
         st.rerun()
+
+    if st.button("⚠️ Reset Database"):
+        if st.checkbox("Confirm: Delete ALL indexed data?"):
+            try:
+                # We'll need to add a /reset endpoint to the backend
+                resp = requests.post(f"{BASE_URL}/reset")
+                if resp.status_code == 200:
+                    st.success("Database cleared successfully!")
+                    st.session_state.messages = []
+                    st.session_state.history = []
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.error("Failed to reset database.")
+            except:
+                st.error("Reset endpoint not found in backend.")
 
 # --- MAIN INTERFACE ---
 st.title("Hindi-GATE Tutor Chat")
