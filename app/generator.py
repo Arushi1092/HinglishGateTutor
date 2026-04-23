@@ -19,32 +19,66 @@ client = Groq(api_key=api_key)
 # ----------------------------
 # Prompts
 # ----------------------------
-SYSTEM_EN = """You are a strict GATE/JEE tutor.
+SYSTEM_EN = """You are a helpful and strict GATE/JEE tutor.
 
 Your task is to answer the student's question based ONLY on the provided context.
 
 Rules:
 1. Use ONLY the provided context. Do NOT use external knowledge.
-2. If the context mentions a definition is present but doesn't show it, or if information is missing, state: "I don't have enough information from the provided context."
-3. Be concise and use a professional, educational tone.
-4. MANDATORY: You must end every response with the exact phrase: "Want a similar practice problem?"
+2. If the student asks a follow-up question (like "Explain with an example"), look at the "Previous conversation" to understand what they are talking about.
+3. If the context describes a situation, application, or process (like "sorting" or "routing"), use that as the example.
+4. If information is truly missing, state: "I don't have enough information from the provided context."
+5. Be concise and professional.
+6. MANDATORY: You must end every response with the exact phrase: "Want a similar practice problem?"
 """
 
-SYSTEM_HI = """आप एक सख्त GATE/JEE शिक्षक हैं।
+SYSTEM_HI = """आप एक मददगार और सख्त GATE/JEE शिक्षक हैं।
 
 आपका कार्य केवल दिए गए संदर्भ के आधार पर छात्र के प्रश्न का उत्तर देना है।
 
 नियम:
 1. केवल दिए गए संदर्भ का उपयोग करें। बाहरी ज्ञान का उपयोग न करें।
-2. यदि संदर्भ में उल्लेख है कि परिभाषा मौजूद है लेकिन वह नहीं दी गई है, या यदि जानकारी गायब है, तो कहें: "मेरे पास दिए गए संदर्भ से पर्याप्त जानकारी नहीं है।"
-3. संक्षिप्त रहें और पेशेवर, शैक्षिक स्वर का उपयोग करें।
-4. अनिवार्य: आपको हर उत्तर के अंत में यह सटीक वाक्यांश लिखना होगा: "क्या आप एक समान अभ्यास प्रश्न चाहते हैं?"
+2. यदि छात्र कोई अनुवर्ती प्रश्न पूछता है (जैसे "उदाहरण के साथ समझाएं"), तो यह समझने के लिए "पिछली बातचीत" देखें कि वे किस बारे में बात कर रहे हैं।
+3. यदि संदर्भ किसी स्थिति, अनुप्रयोग या प्रक्रिया (जैसे "सॉर्टिंग" या "रूटिंग") का वर्णन करता है, तो उसे उदाहरण के रूप में उपयोग करें।
+4. यदि जानकारी वास्तव में गायब है, तो कहें: "मेरे पास दिए गए संदर्भ से पर्याप्त जानकारी नहीं है।"
+5. संक्षिप्त और पेशेवर रहें।
+6. अनिवार्य: आपको हर उत्तर के अंत में यह सटीक वाक्यांश लिखना होगा: "क्या आप एक समान अभ्यास प्रश्न चाहते हैं?"
 """
 
+REWRITE_PROMPT = """Given the conversation history and a follow-up question, rewrite it into a detailed standalone search query.
+Focus on the technical concept being discussed.
+
+History:
+{history}
+
+Follow-up Question: {query}
+Standalone Search Query:"""
+
 # ----------------------------
-# Helper
+# Helpers
 # ----------------------------
-def build_context(chunks: List[Dict], max_chunks: int = 5):
+def rewrite_query(query: str, history: List[Dict]) -> str:
+    if not history:
+        return query
+
+    # Use the last 3 turns for context
+    history_text = ""
+    for h in history[-3:]:
+        history_text += f"Q: {h.get('q','')}\nA: {h.get('a','')}\n"
+    
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": REWRITE_PROMPT.format(history=history_text, query=query)}],
+            max_tokens=100,
+            temperature=0
+        )
+        rewritten = response.choices[0].message.content.strip().replace('"', '')
+        return rewritten if rewritten else query
+    except:
+        return query
+
+def build_context(chunks: List[Dict], max_chunks: int = 10):
     chunks = chunks[:max_chunks]
     return "\n\n---\n\n".join(
         f"[Source: {c['source']}]\n{' '.join(c['text'].split())}"
@@ -54,7 +88,11 @@ def build_context(chunks: List[Dict], max_chunks: int = 5):
 # ----------------------------
 # Main function
 # ----------------------------
-def generate_answer(query: str, chunks: List[Dict], lang: str = "en"):
+def generate_answer(query: str, chunks: List[Dict], lang: str = "en", history: List[Dict] = None):
+    if history is None:
+        history = []
+
+    # Fallback for no context
     if not chunks:
         return (
             "I don't have enough information from the provided context.\n\nWant a similar practice problem?"
@@ -72,23 +110,29 @@ def generate_answer(query: str, chunks: List[Dict], lang: str = "en"):
 
     system = SYSTEM_HI if lang == "hi" else SYSTEM_EN
 
-    # limit context
-    context = build_context(chunks, max_chunks=5)
+    # Use up to 10 chunks for rich context
+    context = build_context(chunks, max_chunks=10)
 
-    user_message = f"""Context:
-{context}
+    # 🧠 Build history string
+    history_str = ""
+    if history:
+        for h in history[-3:]:
+            history_str += f"Student: {h.get('q','')}\nTutor: {h.get('a','')}\n"
 
-Question: {query}
-"""
+    # 🔥 Structured prompt
+    user_prompt = f"### Context:\n{context}\n\n"
+    if history_str:
+        user_prompt += f"### Previous Conversation:\n{history_str}\n\n"
+    user_prompt += f"### Current Question: {query}"
 
     try:
         response = client.chat.completions.create(
             model="llama-3.1-8b-instant",
-            max_tokens=400,
-            temperature=0.2,  # more deterministic, less hallucination
+            max_tokens=500,
+            temperature=0.1,
             messages=[
                 {"role": "system", "content": system},
-                {"role": "user", "content": user_message}
+                {"role": "user", "content": user_prompt}
             ]
         )
 
