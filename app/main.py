@@ -132,6 +132,58 @@ async def ask(req: AskRequest):
     }
 
 
+# ── MANAGE SOURCES ─────────────────────────────────────
+@app.get("/sources")
+async def list_sources():
+    # Get unique sources from the current all_chunks list
+    sources = list(set(c["source"] for c in all_chunks))
+    return {"sources": sorted(sources)}
+
+@app.delete("/source/{filename}")
+async def delete_source(filename: str):
+    global bm25_index, all_chunks
+    client = get_qdrant_client()
+    
+    try:
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+        
+        # 1. Delete from Qdrant
+        client.delete(
+            collection_name=COLLECTION,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(key="source", match=MatchValue(value=filename))
+                ]
+            )
+        )
+        
+        # 2. Rebuild local index to sync
+        bm25_index, all_chunks = build_bm25_index()
+        
+        print(f"🗑️ Deleted source: {filename}")
+        return {"status": "success", "message": f"Deleted {filename}"}
+    except Exception as e:
+        raise HTTPException(500, f"Deletion failed: {str(e)}")
+
+
+# ── RESET DATABASE ────────────────────────────────────
+@app.post("/reset")
+async def reset():
+    global bm25_index, all_chunks
+    try:
+        # Recreate collection (this deletes all data)
+        create_collection(force_recreate=True)
+        
+        # Reset global state
+        bm25_index = None
+        all_chunks = []
+        
+        print("🚨 Database Reset Triggered")
+        return {"status": "success", "message": "All data cleared"}
+    except Exception as e:
+        raise HTTPException(500, f"Reset failed: {str(e)}")
+
+
 # ── GET /health ────────────────────────────────────────
 @app.get("/health")
 def health():
