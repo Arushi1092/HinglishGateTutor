@@ -2,11 +2,38 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 import shutil, tempfile, os
 
-from app.ingest import ingest_pdf, create_collection
+from app.ingest import ingest_pdf, ingest_text, create_collection
 from app.retriever import hybrid_search, build_bm25_index, prepare_query, get_qdrant_client, COLLECTION
 from app.generator import generate_answer, rewrite_query
+from app.wiki import fetch_wikipedia_content
+import json
 
 app = FastAPI(title="Hindi-GATE Tutor", version="1.0")
+
+GOLDEN_DATA_PATH = "data/golden_qa.json"
+
+# ── EVALUATION HELPERS ────────────────────────────────
+def judge_response(question, golden, generated, sources):
+    from app.generator import client
+    prompt = f"""
+    Compare the Generated Answer against the Golden Answer for the Question.
+    Question: {question}
+    Golden Answer: {golden}
+    Generated Answer: {generated}
+    Sources: {sources}
+
+    Return JSON: {{"accuracy": score_1_to_5, "reasoning": "why"}}
+    """
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0
+        )
+        return json.loads(response.choices[0].message.content)
+    except:
+        return None
 
 # Global BM25 state
 bm25_index, all_chunks = None, []
@@ -86,6 +113,44 @@ async def ingest(file: UploadFile = File(...)):
         os.unlink(tmp_path)
 
 
+# ── POST /wiki ────────────────────────────────────────
+class WikiRequest(BaseModel):
+    title: str
+    lang: str = "en"
+
+
+@app.post("/wiki")
+async def ingest_wiki(req: WikiRequest):
+    source_name = f"wiki:{req.title}"
+    
+    if already_ingested(source_name):
+        return {
+            "title": req.title,
+            "ingested_chunks": 0,
+            "status": "already_ingested"
+        }
+
+    text = fetch_wikipedia_content(req.title, req.lang)
+    if not text:
+        raise HTTPException(404, f"Wikipedia page '{req.title}' not found")
+
+    try:
+        n = ingest_text(text, source_name)
+
+        global bm25_index, all_chunks
+        bm25_index, all_chunks = build_bm25_index()
+
+        print(f"✅ Ingested {n} chunks from Wikipedia: {req.title}")
+
+        return {
+            "title": req.title,
+            "ingested_chunks": n,
+            "status": "success"
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Ingestion failed: {str(e)}")
+
+
 # ── POST /ask ──────────────────────────────────────────
 class AskRequest(BaseModel):
     question: str
@@ -124,11 +189,31 @@ async def ask(req: AskRequest):
         history=req.history
     )
 
+    # 5. Optional: Real-time Evaluation if in Golden Dataset
+    eval_result = None
+    if os.path.exists(GOLDEN_DATA_PATH):
+        try:
+            with open(GOLDEN_DATA_PATH, "r", encoding="utf-8") as f:
+                golden_data = json.load(f)
+                for item in golden_data:
+                    if item["question"].lower().strip() == req.question.lower().strip():
+                        eval_result = judge_response(
+                            req.question, 
+                            item["golden_answer"], 
+                            answer, 
+                            list(set(c["source"] for c in chunks))
+                        )
+                        break
+        except:
+            pass
+
     return {
         "question": req.question,
         "language_detected": q_info["lang"],
         "answer": answer,
-        "sources": list(set(c["source"] for c in chunks))
+        "sources": list(set(c["source"] for c in chunks)),
+        "chunks": chunks, # Return full chunks for evaluation
+        "evaluation": eval_result
     }
 
 
@@ -191,3 +276,10 @@ def health():
         "status": "ok",
         "chunks_indexed": len(all_chunks)
     }
+
+@app.get("/golden_qa")
+async def get_golden_qa():
+    if os.path.exists(GOLDEN_DATA_PATH):
+        with open(GOLDEN_DATA_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []

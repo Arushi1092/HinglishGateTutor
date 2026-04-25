@@ -1,6 +1,6 @@
 import fitz  # PyMuPDF
 from app.retriever import build_bm25_index, get_qdrant_client, get_embedder
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, HnswConfigDiff, ScalarQuantization, ScalarType
 import uuid, os
 
 COLLECTION = "gate_docs"
@@ -21,8 +21,6 @@ def chunk_text(text: str) -> list[str]:
         start += CHUNK_SIZE - OVERLAP
     return chunks
 
-from qdrant_client.models import Distance, VectorParams, PointStruct, HnswConfigDiff, ScalarQuantization, ScalarType
-
 def create_collection(force_recreate=False):
     client = get_qdrant_client()
     if client.collection_exists(COLLECTION):
@@ -42,7 +40,7 @@ def create_collection(force_recreate=False):
         )
     )
 
-def ingest_pdf(pdf_path: str, source_name: str):
+def ingest_text(text: str, source_name: str):
     import torch
     client = get_qdrant_client()
     embedder = get_embedder()
@@ -52,22 +50,15 @@ def ingest_pdf(pdf_path: str, source_name: str):
     if str(embedder.device) != device:
         embedder.to(device)
     
-    print(f"📖 Extracting text from: {source_name}")
-    text = extract_text(pdf_path)
     chunks = chunk_text(text)
-    
     total_chunks = len(chunks)
-    batch_size = 128  # Faster than processing all at once
+    batch_size = 128
     
-    print(f"📦 Processing {total_chunks} chunks using {device} (Batch Size: {batch_size})")
+    print(f"📦 Processing {total_chunks} chunks for {source_name} using {device} (Batch Size: {batch_size})")
 
-    all_points = []
-    
-    # Process in batches to save memory and handle large books
     for i in range(0, total_chunks, batch_size):
         batch_texts = chunks[i : i + batch_size]
         
-        # 🧠 Batched embedding generation
         batch_embeddings = embedder.encode(
             batch_texts, 
             batch_size=batch_size, 
@@ -84,12 +75,16 @@ def ingest_pdf(pdf_path: str, source_name: str):
             for chunk, emb in zip(batch_texts, batch_embeddings)
         ]
         
-        # Incremental upsert to Qdrant
         client.upsert(collection_name=COLLECTION, points=points)
         print(f"✅ Indexed {min(i + batch_size, total_chunks)}/{total_chunks} chunks...")
 
     print(f"🎉 Successfully ingested {source_name}")
     return total_chunks
+
+def ingest_pdf(pdf_path: str, source_name: str):
+    print(f"📖 Extracting text from PDF: {source_name}")
+    text = extract_text(pdf_path)
+    return ingest_text(text, source_name)
 
 if __name__ == "__main__":
     create_collection(force_recreate=True)
