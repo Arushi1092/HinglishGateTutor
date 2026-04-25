@@ -1,0 +1,302 @@
+[
+  {
+    "question": "What is the Time Complexity of Merge Sort?",
+    "golden_answer": "The time complexity of Merge Sort is O(n log n) in all cases (worst, best, and average).",
+    "context_expected": "wiki:Merge sort"
+  },
+  {
+    "question": "Define the Master Theorem for recurrences.",
+    "golden_answer": "The Master Theorem provides a cookbook solution for recurrences of the form T(n) = aT(n/b) + f(n), where a >= 1 and b > 1.",
+    "context_expected": "wiki:Master theorem (analysis of algorithms)"
+  },
+  {
+    "question": "What is the worst-case time complexity of Quicksort?",
+    "golden_answer": "The worst-case time complexity of Quicksort is O(n^2), which occurs when the pivot is always the smallest or largest element.",
+    "context_expected": "wiki:Quicksort"
+  },
+  {
+    "question": "What is a Binary Search Tree (BST)?",
+    "golden_answer": "A BST is a binary tree where for every node, the left subtree contains only values less than the node, and the right subtree contains only values greater.",
+    "context_expected": "wiki:Binary search tree"
+  },
+  {
+    "question": "How does Prim's Algorithm work?",
+    "golden_answer": "Prim's algorithm finds a Minimum Spanning Tree by starting from an arbitrary node and repeatedly adding the cheapest edge from the tree to a node not yet in the tree.",
+    "context_expected": "wiki:Prim's algorithm"
+  },
+  {
+    "question": "What is the principle of Dynamic Programming?",
+    "golden_answer": "Dynamic Programming solves complex problems by breaking them down into simpler subproblems and storing the results (memoization) to avoid redundant work.",
+    "context_expected": "wiki:Dynamic programming"
+  },
+  {
+    "question": "What is collision in a Hash Table?",
+    "golden_answer": "A collision occurs when two different keys are hashed to the same index in a hash table.",
+    "context_expected": "wiki:Hash table"
+  },
+  {
+    "question": "Define Breadth-First Search (BFS).",
+    "golden_answer": "BFS is a graph traversal algorithm that starts at a source node and explores all neighbor nodes at the present depth before moving to nodes at the next depth level.",
+    "context_expected": "wiki:Breadth-first search"
+  },
+  {
+    "question": "What is Dijkstra's Algorithm used for?",
+    "golden_answer": "Dijkstra's algorithm is used for finding the shortest paths between nodes in a graph, which may represent, for example, road networks.",
+    "context_expected": "wiki:Dijkstra's algorithm"
+  },
+  {
+    "question": "What is a symmetric matrix?",
+    "golden_answer": "A symmetric matrix is a square matrix that is equal to its transpose (A = A^T).",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "Define the Rank of a Matrix.",
+    "golden_answer": "The rank of a matrix is the maximum number of linearly independent rows or columns in the matrix.",
+    "context_expected": "wiki:Rank (linear algebra)"
+  },
+  {
+    "question": "What is a Tautology in logic?",
+    "golden_answer": "A tautology is a formula or assertion that is true in every possible interpretation or truth value assignment.",
+    "context_expected": "wiki:Tautology (logic)"
+  },
+  {
+    "question": "Define an Equivalence Relation.",
+    "golden_answer": "An equivalence relation is a binary relation that is reflexive, symmetric, and transitive.",
+    "context_expected": "wiki:Equivalence relation"
+  },
+  {
+    "question": "What is a Heap data structure?",
+    "golden_answer": "A heap is a specialized tree-based data structure that satisfies the heap property: in a max heap, for any given node C, if P is a parent node of C, then the value of P is greater than or equal to the value of C.",
+    "context_expected": "wiki:Heap (data structure)"
+  },
+  {
+    "question": "Explain Stability in sorting algorithms.",
+    "golden_answer": "A sorting algorithm is stable if it preserves the relative order of equal elements (records with the same key).",
+    "context_expected": "wiki:Sorting algorithm"
+  },
+  {
+    "question": "What is a Directed Acyclic Graph (DAG)?",
+    "golden_answer": "A DAG is a directed graph that has no directed cycles.",
+    "context_expected": "wiki:Directed acyclic graph"
+  },
+  {
+    "question": "What does O(1) complexity mean?",
+    "golden_answer": "O(1) or constant time complexity means the time taken by the algorithm remains the same regardless of the input size.",
+    "context_expected": "wiki:Time complexity"
+  },
+  {
+    "question": "What is Open Addressing?",
+    "golden_answer": "Open addressing is a method of collision resolution in hash tables where all entry records are stored in the bucket array itself.",
+    "context_expected": "wiki:Hash table"
+  },
+  {
+    "question": "What is the height of a balanced binary tree?",
+    "golden_answer": "The height of a balanced binary tree with n nodes is O(log n).",
+    "context_expected": "wiki:Binary search tree"
+  },
+  {
+    "question": "Define De Morgan's Laws.",
+    "golden_answer": "De Morgan's laws are a pair of transformation rules relating the logical operators 'and' and 'or' through negation.",
+    "context_expected": "wiki:De Morgan's laws"
+  },
+  {
+    "question": "What is an Identity Matrix?",
+    "golden_answer": "An identity matrix is a square matrix in which all the elements of the principal diagonal are ones and all other elements are zeros.",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "What is the Power Set of a set?",
+    "golden_answer": "The power set of a set S is the set of all subsets of S, including the empty set and S itself.",
+    "context_expected": "wiki:Power set"
+  },
+  {
+    "question": "Define Big-Omega (Ω) notation.",
+    "golden_answer": "Big-Omega notation provides an asymptotic lower bound for the growth rate of a function.",
+    "context_expected": "wiki:Big O notation"
+  },
+  {
+    "question": "What is a Complete Graph?",
+    "golden_answer": "A complete graph is a simple undirected graph in which every pair of distinct vertices is connected by a unique edge.",
+    "context_expected": "wiki:Complete graph"
+  },
+  {
+    "question": "What is the Longest Common Subsequence (LCS) problem?",
+    "golden_answer": "The LCS problem is finding the longest subsequence common to all sequences in a set of sequences (usually two).",
+    "context_expected": "wiki:Longest common subsequence"
+  },
+  {
+    "question": "Define an Invertible Matrix.",
+    "golden_answer": "A square matrix A is invertible if there exists a matrix B such that AB = BA = I, where I is the identity matrix.",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "What is the Pigeonhole Principle?",
+    "golden_answer": "The principle states that if n items are put into m containers, with n > m, then at least one container must contain more than one item.",
+    "context_expected": "wiki:Pigeonhole principle"
+  },
+  {
+    "question": "Is Merge Sort an in-place algorithm?",
+    "golden_answer": "Standard Merge Sort is not an in-place algorithm as it requires O(n) extra space for merging.",
+    "context_expected": "wiki:Merge sort"
+  },
+  {
+    "question": "Define Space Complexity.",
+    "golden_answer": "Space complexity is the amount of memory space required by an algorithm to run as a function of the length of the input.",
+    "context_expected": "wiki:Space complexity"
+  },
+  {
+    "question": "What is a Greedy Algorithm?",
+    "golden_answer": "A greedy algorithm is any algorithm that follows the problem-solving heuristic of making the locally optimal choice at each stage with the hope of finding a global optimum.",
+    "context_expected": "wiki:Greedy algorithm"
+  },
+  {
+    "question": "मैट्रिक्स क्या है?",
+    "golden_answer": "मैट्रिक्स संख्याओं या प्रतीकों का एक आयताकार विन्यास (array) है, जिसे पंक्तियों और स्तंभों में व्यवस्थित किया जाता है।",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "स्केलर मैट्रिक्स (Scalar Matrix) किसे कहते हैं?",
+    "golden_answer": "एक डायगोनल मैट्रिक्स जिसके सभी डायगोनल तत्व समान होते हैं, उसे स्केलर मैट्रिक्स कहा जाता है।",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "'P implies Q' (P -> Q) कब गलत होता है?",
+    "golden_answer": "P -> Q केवल तब गलत (False) होता है जब P सही हो और Q गलत हो।",
+    "context_expected": "wiki:Material conditional"
+  },
+  {
+    "question": "एक रिक्त समुच्चय (Empty Set) क्या है?",
+    "golden_answer": "वह समुच्चय जिसमें कोई भी तत्व नहीं होता, उसे रिक्त समुच्चय कहते हैं। इसे Ø से दर्शाया जाता है।",
+    "context_expected": "wiki:Empty set"
+  },
+  {
+    "question": "मैट्रिक्स के ट्रांसपोज (Transpose) से आप क्या समझते हैं?",
+    "golden_answer": "यदि हम किसी मैट्रिक्स की पंक्तियों को स्तंभों में और स्तंभों को पंक्तियों में बदल दें, तो प्राप्त मैट्रिक्स को ट्रांसपोज कहते हैं।",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "योजक (Injective) फलन क्या है?",
+    "golden_answer": "एक फलन f योजक होता है यदि डोमेन के अलग-अलग तत्वों के इमेज भी अलग-अलग हों।",
+    "context_expected": "wiki:Injective function"
+  },
+  {
+    "question": "'Subset' (उप-समुच्चय) की परिभाषा क्या है?",
+    "golden_answer": "यदि समुच्चय A का प्रत्येक तत्व समुच्चय B का भी तत्व है, तो A को B का उप-समुच्चय कहा जाता है।",
+    "context_expected": "wiki:Subset"
+  },
+  {
+    "question": "सिंगुलर मैट्रिक्स (Singular Matrix) क्या है?",
+    "golden_answer": "एक वर्ग मैट्रिक्स जिसका डिटरमिनेंट (determinant) शून्य होता है, उसे सिंगुलर मैट्रिक्स कहते हैं।",
+    "context_expected": "wiki:Singular matrix"
+  },
+  {
+    "question": "'Conjunction' (∧) का मतलब क्या है?",
+    "golden_answer": "दो कथनों का कंजंक्शन तभी सही होता है जब दोनों व्यक्तिगत कथन सही हों।",
+    "context_expected": "wiki:Logical conjunction"
+  },
+  {
+    "question": "बाइनरी ऑपरेशन (Binary Operation) क्या है?",
+    "golden_answer": "एक बाइनरी ऑपरेशन एक नियम है जो एक सेट के दो तत्वों को मिलाकर उसी सेट का एक नया तत्व बनाता है।",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "'Reflexive Relation' क्या होता है?",
+    "golden_answer": "एक संबंध R रिफ्लेक्सिव होता है यदि सेट के हर तत्व a के लिए (a, a) ∈ R हो।",
+    "context_expected": "wiki:Reflexive relation"
+  },
+  {
+    "question": "डायगोनल मैट्रिक्स (Diagonal Matrix) क्या है?",
+    "golden_answer": "एक वर्ग मैट्रिक्स जिसके मुख्य डायगोनल के बाहर के सभी तत्व शून्य होते हैं।",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "गणितीय आगमन (Mathematical Induction) क्या है?",
+    "golden_answer": "यह एक गणितीय प्रमाण तकनीक है जिसका उपयोग यह साबित करने के लिए किया जाता है कि एक कथन सभी प्राकृतिक संख्याओं के लिए सही है।",
+    "context_expected": "wiki:Mathematical induction"
+  },
+  {
+    "question": "सरजेक्टिव (Surjective) फलन क्या है?",
+    "golden_answer": "एक फलन सरजेक्टिव होता है यदि को-डोमेन के हर तत्व का कम से कम एक प्री-इमेज डोमेन में हो।",
+    "context_expected": "wiki:Surjective function"
+  },
+  {
+    "question": "'Disjunction' (∨) कब सही होता है?",
+    "golden_answer": "डिस्जंक्शन तब सही होता है जब कम से कम एक कथन सही हो।",
+    "context_expected": "wiki:Logical disjunction"
+  },
+  {
+    "question": "स्क्यू-सिमिट्रिक (Skew-symmetric) मैट्रिक्स क्या है?",
+    "golden_answer": "एक वर्ग मैट्रिक्स A जहाँ A^T = -A होता है।",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "'Power Set' में कितने तत्व होते हैं?",
+    "golden_answer": "यदि किसी सेट में n तत्व हैं, तो उसके पावर सेट में 2^n तत्व होंगे।",
+    "context_expected": "wiki:Power set"
+  },
+  {
+    "question": "'Symmetric Relation' क्या है?",
+    "golden_answer": "यदि (a, b) ∈ R होने पर (b, a) ∈ R भी हो, तो उसे सिमिट्रिक संबंध कहते हैं।",
+    "context_expected": "wiki:Symmetric relation"
+  },
+  {
+    "question": "दो मैट्रिक्स का योग (Sum) कब संभव है?",
+    "golden_answer": "दो मैट्रिक्स को केवल तब जोड़ा जा सकता है जब उनका आर्डर (Order/Dimension) समान हो।",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "नल मैट्रिक्स (Null Matrix) क्या है?",
+    "golden_answer": "एक मैट्रिक्स जिसके सभी तत्व शून्य होते हैं, उसे नल या जीरो मैट्रिक्स कहते हैं।",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "यूनियन (Union) ऑफ सेट्स क्या है?",
+    "golden_answer": "दो सेट्स A और B का यूनियन वह सेट है जिसमें वे सभी तत्व होते हैं जो या तो A में हैं या B में।",
+    "context_expected": "wiki:Union (set theory)"
+  },
+  {
+    "question": "इंटरसेक्शन (Intersection) क्या है?",
+    "golden_answer": "दो सेट्स का इंटरसेक्शन वह सेट है जिसमें केवल वे तत्व होते हैं जो दोनों सेट्स में सामान्य (common) हैं।",
+    "context_expected": "wiki:Intersection (set theory)"
+  },
+  {
+    "question": "को-फैक्टर (Cofactor) क्या होता है?",
+    "golden_answer": "मैट्रिक्स के किसी तत्व का को-फैक्टर उसके माइनर (minor) को उचित चिन्ह (+/-) के साथ गुणा करके प्राप्त किया जाता है।",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "ट्रांजिटिव (Transitive) संबंध क्या है?",
+    "golden_answer": "यदि (a, b) ∈ R और (b, c) ∈ R होने पर (a, c) ∈ R भी हो।",
+    "context_expected": "wiki:Transitive relation"
+  },
+  {
+    "question": "फंक्शन (Function) का 'Domain' क्या है?",
+    "golden_answer": "उन सभी इनपुट मानों का सेट जिनके लिए फंक्शन परिभाषित है।",
+    "context_expected": "wiki:Domain of a function"
+  },
+  {
+    "question": "'Negation' (¬) का क्या अर्थ है?",
+    "golden_answer": "नेगेशन किसी कथन के सत्य मान को उलट देता है (सही को गलत, गलत को सही)।",
+    "context_expected": "wiki:Negation"
+  },
+  {
+    "question": "एड्जॉइंट (Adjoint) मैट्रिक्स कैसे निकालते हैं?",
+    "golden_answer": "मैट्रिक्स के तत्वों को उनके को-फैक्टर्स से बदलकर और फिर उसका ट्रांसपोज लेकर एड्जॉइंट निकाला जाता है।",
+    "context_expected": "Mathematics-Part1-Class-12-1-46.pdf"
+  },
+  {
+    "question": "फाइनाइट सेट (Finite Set) क्या है?",
+    "golden_answer": "एक सेट जिसमें तत्वों की संख्या सीमित और गणनीय (countable) होती है।",
+    "context_expected": "wiki:Finite set"
+  },
+  {
+    "question": "यूनिवर्सल सेट (Universal Set) क्या है?",
+    "golden_answer": "वह सेट जिसमें विचाराधीन संदर्भ के सभी तत्व शामिल होते हैं।",
+    "context_expected": "wiki:Universal set"
+  },
+  {
+    "question": "अपर ट्राएंगुलर (Upper Triangular) मैट्रिक्स क्या है?",
+    "golden_answer": "एक वर्ग मैट्रिक्स जिसमें मुख्य डायगोनल के नीचे के सभी तत्व शून्य होते हैं।",
+    "context_expected": "wiki:Triangular matrix"
+  }
+]

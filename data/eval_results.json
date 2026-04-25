@@ -1,0 +1,38 @@
+{
+  "average_accuracy": 3.3333333333333335,
+  "details": [
+    {
+      "question": "What is a group in abstract algebra?",
+      "golden": "A group is a set G equipped with a binary operation * that satisfies four axioms: closure, associativity, the existence of an identity element, and the existence of inverse elements for every member of the set.",
+      "generated": "A group in abstract algebra is a set S together with a binary operation \u02da defined on S, for which the following properties hold:\n\n1. Closure: For all a, b in S, we have a \u02da b in S.\n2. Associativity: For all a, b, c in S, we have (a \u02da b) \u02da c = a \u02da (b \u02da c).\n3. Identity: There exists an element e in S, called the identity, such that for all a in S, we have a \u02da e = e \u02da a = a.\n4. Inverse: For each a in S, there exists an element b in S, called the inverse of a, such that a \u02da b = b \u02da a = e.\n\nWant a similar practice problem?",
+      "score": {
+        "accuracy": 5,
+        "completeness": 5,
+        "faithfulness": 5,
+        "reasoning": "The generated answer is factually correct and covers all key points mentioned in the golden answer. The answer is also grounded in the retrieved sources, with clear citations to 'wiki:discrete mathematics' and 'DS CLRS 3rd ed.pdf'. The format and detail of the generated answer are identical to the golden answer, indicating a high level of faithfulness to the original source material."
+      }
+    },
+    {
+      "question": "Define a Binary Search Tree (BST).",
+      "golden": "A Binary Search Tree is a node-based binary tree data structure where each node has at most two children. For any given node, the values in its left subtree are less than the node's value, and the values in its right subtree are greater than the node's value.",
+      "generated": "I don't have enough information from the provided context.\n\nWant a similar practice problem?",
+      "score": {
+        "accuracy": 0,
+        "completeness": 0,
+        "faithfulness": 0,
+        "reasoning": "The generated answer is completely unrelated to the definition of a Binary Search Tree, resulting in a score of 0 for accuracy and completeness. Additionally, there is no indication of source citations, leading to a score of 0 for faithfulness."
+      }
+    },
+    {
+      "question": "What are the four basic arithmetic operations in mathematics?",
+      "golden": "The four basic arithmetic operations are addition, subtraction, multiplication, and division.",
+      "generated": "The four basic arithmetic operations in mathematics are addition, subtraction, multiplication, and division. \n\nWant a similar practice problem?",
+      "score": {
+        "accuracy": 5,
+        "completeness": 5,
+        "faithfulness": 5,
+        "reasoning": "The generated answer is identical to the golden answer, covering all key points and accurately representing the four basic arithmetic operations in mathematics. The sources used (Mathematics-Part1-Class-12.pdf, DS CLRS 3rd ed.pdf) are relevant and support the answer, indicating high faithfulness."
+      }
+    }
+  ]
+}

@@ -12,3 +12,4 @@ groq
 torch
 streamlit
 requests
+wikipedia-api
