@@ -6,7 +6,8 @@ An AI-powered tutoring system designed for GATE/JEE preparation. This applicatio
 - **Hybrid Retrieval:** Combines semantic search (Dense) with keyword matching (BM25) for high-precision retrieval.
 - **Advanced Reranking:** Utilizes a Cross-Encoder to re-score candidates, ensuring the most relevant context is fed to the LLM.
 - **Conversational Memory:** Maintains context through multi-turn dialogues with LLM-driven **Query Rewriting**.
-- **Optimized Ingestion:** Batched PDF processing with GPU acceleration and HNSW indexing for scalability.
+- **Optimized Ingestion:** High-speed processing using **multi-process CPU encoding** and **parallel Qdrant uploads**.
+- **Startup Pre-loading:** Models are pre-cached and loaded at server startup for zero-latency first queries.
 - **Dynamic Library:** Manage your knowledge base with the ability to ingest or delete specific documents.
 
 ## 🧠 Tech Stack
@@ -14,7 +15,7 @@ An AI-powered tutoring system designed for GATE/JEE preparation. This applicatio
 - **Frontend:** Streamlit
 - **Vector DB:** Qdrant (with INT8 Quantization)
 - **LLM:** Llama-3 (via Groq Cloud)
-- **Embeddings:** `paraphrase-multilingual-mpnet-base-v2`
+- **Embeddings:** `paraphrase-multilingual-MiniLM-L12-v2` (Fast, Multilingual)
 - **Search Logic:** Rank-BM25 + RRF (Reciprocal Rank Fusion)
 
 ## 🛠️ Installation & Setup
