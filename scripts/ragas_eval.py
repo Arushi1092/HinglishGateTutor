@@ -20,7 +20,7 @@ from ragas.embeddings import embedding_factory
 # ----------------------------
 load_dotenv()
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 # ----------------------------
 # API Key Check
@@ -105,11 +105,24 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
             # RAGAS cannot decompose statements with no context to check against.
             raw_contexts = resp_json.get("contexts")  # clean List[str] from updated main.py
 
-            if chunks and isinstance(chunks[0], dict):
+            if raw_contexts and isinstance(raw_contexts, list) and isinstance(raw_contexts[0], str):
+                contexts = raw_contexts
+            else:
+                # fallback: extract from chunks dicts (handles both old + new main.py)
+                chunks = resp_json.get("chunks", [])
+                if chunks and isinstance(chunks[0], dict):
                     # handle both "text" and "chunk" key names defensively
                     contexts = [c.get("text") or c.get("chunk") or "" for c in chunks]
-            else:
-                print("⚠️ No valid chunk text returned → skipping")
+                else:
+                    print("⚠️ No valid chunk text returned → skipping")
+                    continue
+
+            # FIX (NaN faithfulness): filter out empty/very short contexts.
+            # RAGAS returns NaN when it receives blank strings as context entries.
+            contexts = [c.strip() for c in contexts if c and len(c.strip()) > 30]
+
+            if not contexts:
+                print("⚠️ All contexts were empty after filtering → skipping")
                 continue
 
             ground_truth = pair.get("ground_truth") or pair.get("golden_answer", "")
@@ -117,6 +130,10 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
             if not answer or not ground_truth:
                 print("⚠️ Missing answer or ground truth")
                 continue
+
+            # Debug: log context quality so you can spot bad chunks early
+            avg_ctx_len = sum(len(c) for c in contexts) / len(contexts)
+            print(f"   📎 {len(contexts)} contexts, avg length: {avg_ctx_len:.0f} chars")
 
             data["question"].append(pair["question"])
             data["answer"].append(answer)
@@ -168,6 +185,28 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
         df.to_csv("eval/results.csv", index=False)
 
         print("\n✅ Results saved to eval/results.csv")
+
+        # FIX: print per-metric summary + flag failing questions
+        # This tells you WHICH questions have faithfulness < 0.6 (hallucinations)
+        # and answer_relevancy < 0.6 (off-topic) so you know what to fix next
+        print("\n📊 Per-metric summary:")
+        for col in ["faithfulness", "answer_relevancy", "context_precision"]:
+            if col in df.columns:
+                mean_val = df[col].mean()
+                nan_count = df[col].isna().sum()
+                print(f"   {col}: mean={mean_val:.3f}  NaN rows={nan_count}")
+
+        print("\n🚨 Questions needing attention (faithfulness < 0.6 or relevancy < 0.6):")
+        if "faithfulness" in df.columns and "answer_relevancy" in df.columns:
+            bad = df[
+                (df["faithfulness"] < 0.6) | (df["answer_relevancy"] < 0.6)
+            ][["question", "faithfulness", "answer_relevancy", "context_precision"]]
+            if bad.empty:
+                print("   None — all above threshold ✅")
+            else:
+                print(bad.to_string(index=False))
+                bad.to_csv("eval/failing_questions.csv", index=False)
+                print("\n   Saved to eval/failing_questions.csv")
 
     except Exception as e:
         print(f"❌ RAGAS evaluation failed: {e}")
