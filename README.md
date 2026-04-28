@@ -19,29 +19,32 @@ An AI-powered tutoring system designed for GATE/JEE preparation. This applicatio
 
 ## 🛠️ Installation & Setup
 
-### 1. Prerequisites
-- Python 3.10+
-- Groq API Key (Place in `.env` file)
+### Option 1: Docker (Recommended)
+This is the easiest way to run the full stack including the Qdrant vector database.
 
-### 2. Setup Environment
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: .\venv\Scripts\activate
-pip install -r requirements.txt
-```
+1. Ensure you have Docker and Docker Compose installed.
+2. Create a `.env` file with your API keys:
+   ```env
+   GROQ_API_KEY=your_key_here
+   OPENAI_API_KEY=your_key_here
+   ```
+3. Run with Docker Compose:
+   ```bash
+   docker-compose up --build
+   ```
+4. Access the UI at `http://localhost:8501` and the API at `http://localhost:8000`.
 
-### 3. Run the Application
-You will need two terminals:
-
-**Terminal 1 (Backend):**
-```bash
-uvicorn app.main:app --reload
-```
-
-**Terminal 2 (Frontend UI):**
-```bash
-streamlit run app_ui.py
-```
+### Option 2: Local Setup
+1. Prerequisites: Python 3.10+, Groq API Key.
+2. Setup Environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+3. Run the Application (Two terminals):
+   - **Backend:** `uvicorn app.main:app --reload`
+   - **Frontend:** `streamlit run app_ui.py`
 
 ## 📸 Project Structure
 - `app/`: Core logic (Ingestion, Retrieval, Generation)

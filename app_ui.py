@@ -3,8 +3,10 @@ import requests
 import time
 import json
 
+import os
+
 # --- CONFIGURATION ---
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 st.set_page_config(
     page_title="Hindi-GATE Tutor",
     page_icon="🎓",
