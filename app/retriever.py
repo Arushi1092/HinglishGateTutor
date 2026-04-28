@@ -4,12 +4,13 @@ from qdrant_client import QdrantClient
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
 from rank_bm25 import BM25Okapi
+import os
 
 # ----------------------------
 # Config
 # ----------------------------
 COLLECTION = "gate_docs"
-EMBED_MODEL = "paraphrase-multilingual-mpnet-base-v2"
+EMBED_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
 
 _reranker = None
 
@@ -51,8 +52,24 @@ _embedder = None
 
 def get_qdrant_client():
     global _client
+
     if _client is None:
-        _client = QdrantClient(path="./qdrant_data")
+        qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
+
+        _client = QdrantClient(
+            url=qdrant_url,
+            timeout=60
+        )
+        
+        # Verify connection immediately
+        try:
+            _client.get_collections()
+        except Exception:
+            print(f"❌ CRITICAL: Could not connect to Qdrant at {qdrant_url}")
+            print("👉 Make sure Qdrant is running (e.g., 'docker-compose up -d qdrant')")
+            _client = None
+            raise ConnectionError(f"Qdrant offline at {qdrant_url}")
+
     return _client
 
 def get_embedder():
@@ -66,18 +83,42 @@ def get_embedder():
 # ----------------------------
 # We will use get_embedder() and get_qdrant_client() inside functions
 
+# ----------------------------
+# Helpers
+# ----------------------------
+def already_ingested(filename: str) -> bool:
+    client = get_qdrant_client()
+
+    if not client.collection_exists(COLLECTION):
+        return False
+
+    from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+    result = client.scroll(
+        collection_name=COLLECTION,
+        scroll_filter=Filter(
+            must=[
+                FieldCondition(key="source", match=MatchValue(value=filename))
+            ]
+        ),
+        limit=1,
+        with_payload=False
+    )
+
+    return len(result[0]) > 0
+
 def get_all_chunks():
     client = get_qdrant_client()
     if not client.collection_exists(COLLECTION):
         return []
     
-    # Scroll through all points
+    # Scroll through all points with larger limit for speed
     chunks = []
     next_page = None
     while True:
         points, next_page = client.scroll(
             collection_name=COLLECTION,
-            limit=100,
+            limit=1000,
             with_payload=True,
             offset=next_page
         )
