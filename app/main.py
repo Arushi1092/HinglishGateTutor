@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import shutil, tempfile, os
 
 from app.ingest import ingest_pdf, ingest_text, create_collection
-from app.retriever import hybrid_search, build_bm25_index, prepare_query, get_qdrant_client, COLLECTION
+from app.retriever import hybrid_search, build_bm25_index, prepare_query, get_qdrant_client, COLLECTION, already_ingested
 from app.generator import generate_answer, rewrite_query
 from app.wiki import fetch_wikipedia_content
 import json
@@ -39,29 +39,6 @@ def judge_response(question, golden, generated, sources):
 bm25_index, all_chunks = None, []
 
 
-# ── HELPER ────────────────────────────────────────────
-def already_ingested(filename: str) -> bool:
-    client = get_qdrant_client()
-
-    if not client.collection_exists(COLLECTION):
-        return False
-
-    from qdrant_client.models import Filter, FieldCondition, MatchValue
-
-    result = client.scroll(
-        collection_name=COLLECTION,
-        scroll_filter=Filter(
-            must=[
-                FieldCondition(key="source", match=MatchValue(value=filename))
-            ]
-        ),
-        limit=1,
-        with_payload=False
-    )
-
-    return len(result[0]) > 0
-
-
 # ── STARTUP ──────────────────────────────────────────
 @app.on_event("startup")
 async def startup():
@@ -72,9 +49,17 @@ async def startup():
     if not client.collection_exists(COLLECTION):
         create_collection()
 
+    # Pre-load models into memory
+    from app.retriever import get_embedder, get_reranker
+    print("⏳ Loading embedding model...")
+    get_embedder()
+    print("⏳ Loading reranker model...")
+    get_reranker()
+
     bm25_index, all_chunks = build_bm25_index()
 
     print(f"✅ BM25 index built: {len(all_chunks)} chunks")
+    print("🚀 Server ready")
 
 
 # ── POST /ingest ──────────────────────────────────────
@@ -182,6 +167,10 @@ async def ask(req: AskRequest):
     print(f"🔍 Retrieved {len(chunks)} chunks")
 
     # 4. Generate answer with history
+    # FIX (faithfulness NaN + relevancy lock): generator must be told to answer
+    # ONLY from the retrieved chunks. Ensure your generate_answer() system prompt
+    # contains: "Answer ONLY based on the context provided. Do not add any
+    # information not present in the context. If unsure, say so in Hindi."
     answer = generate_answer(
         req.question,
         chunks,
@@ -212,6 +201,7 @@ async def ask(req: AskRequest):
         "language_detected": q_info["lang"],
         "answer": answer,
         "sources": list(set(c["source"] for c in chunks)),
+        "contexts": [c["text"] for c in chunks],  # FIX (NaN faithfulness): expose raw context list for RAGAS evaluation
         "chunks": chunks, # Return full chunks for evaluation
         "evaluation": eval_result
     }

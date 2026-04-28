@@ -1,28 +1,65 @@
 import fitz  # PyMuPDF
-from app.retriever import build_bm25_index, get_qdrant_client, get_embedder
-from qdrant_client.models import Distance, VectorParams, PointStruct, HnswConfigDiff, ScalarQuantization, ScalarType
+import nltk
+from app.retriever import build_bm25_index, get_qdrant_client, get_embedder, already_ingested
+from qdrant_client.models import (
+    Distance,
+    VectorParams,
+    PointStruct,
+    HnswConfigDiff,
+    ScalarQuantization,
+    ScalarQuantizationConfig,   # ✅ NEW
+    ScalarType
+)
 import uuid, os
 
+# ----------------------------
+# COLLECTION name
+# ----------------------------
 COLLECTION = "gate_docs"
-CHUNK_SIZE = 500   # characters
-OVERLAP = 100
 
+# ----------------------------
+# CHUNK CONFIG
+# ----------------------------
+CHUNK_SENTENCES = 6
+OVERLAP_SENTENCES = 2
+
+
+# ----------------------------
+# Extract text from PDF
+# ----------------------------
 def extract_text(pdf_path: str) -> str:
     doc = fitz.open(pdf_path)
     return "\n".join(page.get_text() for page in doc)
 
+
+# ----------------------------
+# Convert text → chunks
+# ----------------------------
 def chunk_text(text: str) -> list[str]:
-    chunks, start = [], 0
-    while start < len(text):
-        end = start + CHUNK_SIZE
-        chunk = text[start:end]
-        if chunk.strip():
-            chunks.append(chunk.strip())
-        start += CHUNK_SIZE - OVERLAP
+    sentences = nltk.sent_tokenize(text)
+
+    # remove very small sentences (noise)
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 40]
+
+    chunks = []
+    step = max(1, CHUNK_SENTENCES - OVERLAP_SENTENCES)
+
+    for i in range(0, len(sentences), step):
+        window = sentences[i : i + CHUNK_SENTENCES]
+
+        # only keep meaningful chunks
+        if len(window) >= 2:
+            chunks.append(" ".join(window))
+
     return chunks
 
+
+# ----------------------------
+# Create Qdrant Collection
+# ----------------------------
 def create_collection(force_recreate=False):
     client = get_qdrant_client()
+
     if client.collection_exists(COLLECTION):
         if force_recreate:
             client.delete_collection(COLLECTION)
@@ -31,64 +68,134 @@ def create_collection(force_recreate=False):
 
     client.create_collection(
         collection_name=COLLECTION,
-        vectors_config=VectorParams(size=768, distance=Distance.COSINE),
-        hnsw_config=HnswConfigDiff(m=16, ef_construct=100),
+    
+        # Vector settings
+        vectors_config=VectorParams(
+            size=384,                  # embedding size for MiniLM-L12
+            distance=Distance.COSINE   # similarity metric
+        ),
+
+        # Index (ANN search)
+       # hnsw_config=HnswConfigDiff(
+        #    m=16,
+         #   ef_construct=100
+        #),
+
+        # ✅ FIXED quantization (NEW API)
         quantization_config=ScalarQuantization(
-            scalar=ScalarType.INT8,
-            quantile=0.99,
-            always_ram=True
+            scalar=ScalarQuantizationConfig(
+                type=ScalarType.INT8,
+                quantile=0.99,
+                always_ram=True
+            )
         )
     )
 
+
+# ----------------------------
+# Ingest raw text
+# ----------------------------
 def ingest_text(text: str, source_name: str):
     import torch
+    from qdrant_client.models import PointStruct
+
     client = get_qdrant_client()
     embedder = get_embedder()
-    
-    # 🚀 Move model to GPU if available
+
+    # Detect device
     device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # Move model if needed (only once)
     if str(embedder.device) != device:
         embedder.to(device)
-    
+
+    # Split into chunks
     chunks = chunk_text(text)
     total_chunks = len(chunks)
-    batch_size = 128
     
-    print(f"📦 Processing {total_chunks} chunks for {source_name} using {device} (Batch Size: {batch_size})")
+    if total_chunks == 0:
+        print(f"⚠️ No chunks extracted for {source_name}")
+        return 0
 
-    for i in range(0, total_chunks, batch_size):
-        batch_texts = chunks[i : i + batch_size]
+    print(f"📦 Processing {total_chunks} chunks for {source_name} using {device}")
+
+    # Convert text → embeddings in optimized batches
+    # SentenceTransformers.encode handles batching internally and is quite efficient
+    batch_size = 64 if device == "cpu" else 128
+    
+    print(f"🧠 Generating embeddings...")
+    if device == "cpu":
+        # Multi-process encoding for CPU is much faster for large numbers of chunks
+        print(f"🔥 Initializing multi-process pool (this may take 30-60s on Windows)...")
+        import time
+        start_time = time.time()
         
-        batch_embeddings = embedder.encode(
-            batch_texts, 
-            batch_size=batch_size, 
-            show_progress_bar=False,
+        pool = embedder.start_multi_process_pool()
+        
+        print(f"✅ Pool initialized in {time.time() - start_time:.2f}s. Starting encoding...")
+        
+        embeddings = embedder.encode_multi_process(
+            chunks,
+            pool,
+            batch_size=batch_size
+        )
+        embedder.stop_multi_process_pool(pool)
+    else:
+        # Standard GPU encoding
+        embeddings = embedder.encode(
+            chunks,
+            batch_size=batch_size,
+            show_progress_bar=True,
             convert_to_numpy=True
         )
-        
-        points = [
-            PointStruct(
-                id=str(uuid.uuid4()),
-                vector=emb.tolist(),
-                payload={"text": chunk, "source": source_name}
-            )
-            for chunk, emb in zip(batch_texts, batch_embeddings)
-        ]
-        
-        client.upsert(collection_name=COLLECTION, points=points)
-        print(f"✅ Indexed {min(i + batch_size, total_chunks)}/{total_chunks} chunks...")
 
-    print(f"🎉 Successfully ingested {source_name}")
+    # Prepare points for Qdrant
+    print(f"📤 Uploading to Qdrant...")
+    points = [
+        PointStruct(
+            id=str(uuid.uuid4()),
+            vector=emb.tolist(),
+            payload={
+                "text": chunk,
+                "source": source_name
+            }
+        )
+        for chunk, emb in zip(chunks, embeddings)
+    ]
+
+    # Use upload_points for high-performance parallel upload
+    client.upload_points(
+        collection_name=COLLECTION,
+        points=points,
+        batch_size=batch_size,
+        parallel=max(1, os.cpu_count() // 2),  # Use half of available cores for upload
+        wait=False
+    )
+
+    print(f"✅ Finished indexing {source_name}")
     return total_chunks
 
+
+# ----------------------------
+# Ingest PDF
+# ----------------------------
 def ingest_pdf(pdf_path: str, source_name: str):
-    print(f"📖 Extracting text from PDF: {source_name}")
+    if already_ingested(source_name):
+        print(f"⚠️ {source_name} already ingested, skipping")
+        return 0
+    print(f"📖 Extracting text from {source_name}")
     text = extract_text(pdf_path)
     return ingest_text(text, source_name)
 
+
+# ----------------------------
+# Run manually
+# ----------------------------
 if __name__ == "__main__":
     create_collection(force_recreate=True)
+
     raw_data_dir = "data/raw"
+
     if os.path.exists(raw_data_dir):
         for fname in os.listdir(raw_data_dir):
             if fname.endswith(".pdf"):

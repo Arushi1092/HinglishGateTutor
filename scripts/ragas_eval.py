@@ -99,10 +99,15 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
             # ----------------------------
             # CRITICAL: ensure we get chunk TEXT
             # ----------------------------
-            chunks = resp_json.get("chunks")
+            # FIX (NaN faithfulness): prefer the new "contexts" key (List[str])
+            # added to /ask response. Fall back to extracting from "chunks" dicts.
+            # NaN happens when contexts is [] or contains empty/whitespace strings —
+            # RAGAS cannot decompose statements with no context to check against.
+            raw_contexts = resp_json.get("contexts")  # clean List[str] from updated main.py
 
             if chunks and isinstance(chunks[0], dict):
-                contexts = [c["text"] for c in chunks]
+                    # handle both "text" and "chunk" key names defensively
+                    contexts = [c.get("text") or c.get("chunk") or "" for c in chunks]
             else:
                 print("⚠️ No valid chunk text returned → skipping")
                 continue
@@ -130,8 +135,11 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
     # ----------------------------
     print("\n🔍 Sample check:")
     print("Q:", data["question"][0])
-    print("A:", data["answer"][0][:100])
-    print("C:", data["contexts"][0][:1])
+    print("A:", data["answer"][0][:120])
+    # FIX: show all context entries + lengths so empty/short contexts are visible
+    print(f"C: {len(data['contexts'][0])} context chunks")
+    for i, ctx in enumerate(data["contexts"][0]):
+        print(f"   [{i}] ({len(ctx)} chars) {ctx[:80]}...")
     print("GT:", data["ground_truth"][0])
 
     dataset = Dataset.from_dict(data)
