@@ -70,7 +70,7 @@ def rewrite_query(query: str, history: List[Dict]) -> str:
     
     try:
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": REWRITE_PROMPT.format(history=history_text, query=query)}],
             max_tokens=100,
             temperature=0
@@ -121,7 +121,7 @@ def generate_answer(query: str, chunks: List[Dict], lang: str = "en", history: L
 
     try:
         response = client.chat.completions.create(
-            model="llama-3.1-70b-versatile",
+            model="llama-3.3-70b-versatile",
             max_tokens=500,
             temperature=0.1,
             messages=[

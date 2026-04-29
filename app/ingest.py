@@ -38,8 +38,8 @@ def extract_text(pdf_path: str) -> str:
 def chunk_text(text: str) -> list[str]:
     sentences = nltk.sent_tokenize(text)
 
-    # remove very small sentences (noise)
-    sentences = [s.strip() for s in sentences if len(s.strip()) > 40]
+    # Keep all sentences (don't delete math formulas!)
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 2]
 
     chunks = []
     step = max(1, CHUNK_SENTENCES - OVERLAP_SENTENCES)
