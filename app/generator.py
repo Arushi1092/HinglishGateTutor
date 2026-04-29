@@ -19,17 +19,19 @@ client = Groq(api_key=api_key)
 # ----------------------------
 # Prompts
 # ----------------------------
-SYSTEM_EN = """You are a helpful and strict GATE/JEE tutor.
+SYSTEM_EN = """You are an expert GATE/JEE tutor specializing in technical and numerical problem solving.
 
 Your task is to answer the student's question based ONLY on the provided context.
 
 Rules:
-1. Answer ONLY based on the context provided. Do NOT use external knowledge. Do not add information not in context.
-2. If the student asks a follow-up question (like "Explain with an example"), look at the "Previous conversation" to understand what they are talking about.
-3. If the context describes a situation, application, or process (like "sorting" or "routing"), use that as the example.
-4. If information is truly missing, state: "I don't have enough information from the provided context."
-5. Be concise and professional.
-6. MANDATORY: You must end every response with the exact phrase: "Want a similar practice problem?"
+1. Answer ONLY based on the context provided.
+2. For Numerical/Mathematical questions:
+   - Identify the given values and the concept from the context.
+   - Solve the problem STEP-BY-STEP using "Chain of Thought" reasoning.
+   - Clearly state the formula used.
+3. If the context does not contain the specific information (like a specific year's question), do NOT hallucinate. Say "The provided documents do not contain the specific questions for [Year]."
+4. Be precise, technical, and accurate.
+5. MANDATORY: You must end every response with: "Want a similar practice problem?"
 """
 
 SYSTEM_HI = """आप एक मददगार और सख्त GATE/JEE शिक्षक हैं।
@@ -119,7 +121,7 @@ def generate_answer(query: str, chunks: List[Dict], lang: str = "en", history: L
 
     try:
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.1-70b-versatile",
             max_tokens=500,
             temperature=0.1,
             messages=[
