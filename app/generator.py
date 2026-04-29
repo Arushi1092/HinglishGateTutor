@@ -24,7 +24,7 @@ SYSTEM_EN = """You are a helpful and strict GATE/JEE tutor.
 Your task is to answer the student's question based ONLY on the provided context.
 
 Rules:
-1. Use ONLY the provided context. Do NOT use external knowledge.
+1. Answer ONLY based on the context provided. Do NOT use external knowledge. Do not add information not in context.
 2. If the student asks a follow-up question (like "Explain with an example"), look at the "Previous conversation" to understand what they are talking about.
 3. If the context describes a situation, application, or process (like "sorting" or "routing"), use that as the example.
 4. If information is truly missing, state: "I don't have enough information from the provided context."
@@ -37,7 +37,7 @@ SYSTEM_HI = """आप एक मददगार और सख्त GATE/JEE श
 आपका कार्य केवल दिए गए संदर्भ के आधार पर छात्र के प्रश्न का उत्तर देना है।
 
 नियम:
-1. केवल दिए गए संदर्भ का उपयोग करें। बाहरी ज्ञान का उपयोग न करें।
+1. केवल दिए गए संदर्भ के आधार पर उत्तर दें। बाहरी ज्ञान का उपयोग न करें। संदर्भ में नहीं दी गई जानकारी न जोड़ें।
 2. यदि छात्र कोई अनुवर्ती प्रश्न पूछता है (जैसे "उदाहरण के साथ समझाएं"), तो यह समझने के लिए "पिछली बातचीत" देखें कि वे किस बारे में बात कर रहे हैं।
 3. यदि संदर्भ किसी स्थिति, अनुप्रयोग या प्रक्रिया (जैसे "सॉर्टिंग" या "रूटिंग") का वर्णन करता है, तो उसे उदाहरण के रूप में उपयोग करें।
 4. यदि जानकारी वास्तव में गायब है, तो कहें: "मेरे पास दिए गए संदर्भ से पर्याप्त जानकारी नहीं है।"
@@ -94,14 +94,6 @@ def generate_answer(query: str, chunks: List[Dict], lang: str = "en", history: L
 
     # Fallback for no context
     if not chunks:
-        return (
-            "I don't have enough information from the provided context.\n\nWant a similar practice problem?"
-            if lang == "en"
-            else "मेरे पास दिए गए संदर्भ से पर्याप्त जानकारी नहीं है।\n\nक्या आप एक समान अभ्यास प्रश्न चाहते हैं?"
-        )
-
-    # 🚫 Guard: block obvious out-of-domain queries
-    if "binary search tree" in query.lower():
         return (
             "I don't have enough information from the provided context.\n\nWant a similar practice problem?"
             if lang == "en"

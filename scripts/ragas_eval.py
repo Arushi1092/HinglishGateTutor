@@ -4,16 +4,21 @@ import os
 from datasets import Dataset
 from ragas import evaluate
 from dotenv import load_dotenv
-from ragas.llms import llm_factory
-from openai import OpenAI
 
-# Metrics
-from ragas.metrics.collections.faithfulness import Faithfulness
-from ragas.metrics.collections.answer_relevancy import AnswerRelevancy
-from ragas.metrics.collections.context_precision import ContextPrecision
+# RAGAS metrics
+from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision
 
-# Embeddings
-from ragas.embeddings import embedding_factory
+# RAGAS Wrappers for Langchain
+from ragas.llms import LangchainLLMWrapper
+from ragas.embeddings import LangchainEmbeddingsWrapper
+
+# Langchain providers
+try:
+    from langchain_groq import ChatGroq
+    from langchain_huggingface import HuggingFaceEmbeddings
+except ImportError:
+    print("❌ Missing dependencies! Run: pip install langchain-groq langchain-huggingface")
+    exit(1)
 
 # ----------------------------
 # Load environment
@@ -23,31 +28,21 @@ load_dotenv()
 BASE_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 # ----------------------------
-# API Key Check
+# LLM & Embeddings Setup (FREE/GROQ FIX)
 # ----------------------------
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    raise ValueError("❌ OPENAI_API_KEY not found. Check your .env file.")
+# Using Groq for evaluation to avoid OpenAI quota issues
+groq_api_key = os.getenv("GROQ_API_KEY")
+if not groq_api_key:
+    raise ValueError("❌ GROQ_API_KEY not found in .env. Evaluation requires an LLM (OpenAI or Groq).")
 
-# ----------------------------
-# LLM Setup
-# ----------------------------
-client = OpenAI(api_key=api_key)
+print("⏳ Initializing Groq (Llama-3.1-70b) for evaluation...")
+langchain_llm = ChatGroq(model="llama-3.1-70b-versatile", groq_api_key=groq_api_key)
+llm = LangchainLLMWrapper(langchain_llm)
 
-llm = llm_factory(
-    "gpt-4o-mini",   # fast + cheap
-    client=client
-)
-
-# ----------------------------
-# Embeddings Setup (MODERN FIX)
-# ----------------------------
-embeddings = embedding_factory(
-    "openai",
-    model="text-embedding-3-small",
-    client=client,          # ✅ same client
-    interface="modern"      # ✅ CRITICAL FIX
-)
+# Use a local multilingual model for RAGAS embeddings (FREE & Fast)
+print("⏳ Loading local embedding model for evaluation (paraphrase-multilingual-MiniLM-L12-v2)...")
+langchain_embeddings = HuggingFaceEmbeddings(model_name="paraphrase-multilingual-MiniLM-L12-v2")
+embeddings = LangchainEmbeddingsWrapper(langchain_embeddings)
 
 # ----------------------------
 # Main Evaluation Function
@@ -68,6 +63,7 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
         "ground_truth": [],
     }
 
+    # Sample a few pairs for evaluation
     selected_pairs = pairs[::sample_step]
     print(f"🚀 Starting evaluation on {len(selected_pairs)} samples...\n")
 
@@ -85,7 +81,7 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
                     "history": [],
                     "top_k": 5,
                 },
-                timeout=120,  # ✅ avoid timeout issues
+                timeout=120,
             )
 
             if resp.status_code != 200:
@@ -93,36 +89,21 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
                 continue
 
             resp_json = resp.json()
-
             answer = resp_json.get("answer", "")
+            raw_contexts = resp_json.get("contexts")
 
-            # ----------------------------
-            # CRITICAL: ensure we get chunk TEXT
-            # ----------------------------
-            # FIX (NaN faithfulness): prefer the new "contexts" key (List[str])
-            # added to /ask response. Fall back to extracting from "chunks" dicts.
-            # NaN happens when contexts is [] or contains empty/whitespace strings —
-            # RAGAS cannot decompose statements with no context to check against.
-            raw_contexts = resp_json.get("contexts")  # clean List[str] from updated main.py
-
-            if raw_contexts and isinstance(raw_contexts, list) and isinstance(raw_contexts[0], str):
+            if raw_contexts and isinstance(raw_contexts, list):
                 contexts = raw_contexts
             else:
-                # fallback: extract from chunks dicts (handles both old + new main.py)
+                # fallback: extract from chunks dicts
                 chunks = resp_json.get("chunks", [])
-                if chunks and isinstance(chunks[0], dict):
-                    # handle both "text" and "chunk" key names defensively
-                    contexts = [c.get("text") or c.get("chunk") or "" for c in chunks]
-                else:
-                    print("⚠️ No valid chunk text returned → skipping")
-                    continue
+                contexts = [c.get("text", "") for c in chunks]
 
-            # FIX (NaN faithfulness): filter out empty/very short contexts.
-            # RAGAS returns NaN when it receives blank strings as context entries.
+            # Clean contexts
             contexts = [c.strip() for c in contexts if c and len(c.strip()) > 30]
 
             if not contexts:
-                print("⚠️ All contexts were empty after filtering → skipping")
+                print("⚠️ No valid context returned → skipping")
                 continue
 
             ground_truth = pair.get("ground_truth") or pair.get("golden_answer", "")
@@ -130,10 +111,6 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
             if not answer or not ground_truth:
                 print("⚠️ Missing answer or ground truth")
                 continue
-
-            # Debug: log context quality so you can spot bad chunks early
-            avg_ctx_len = sum(len(c) for c in contexts) / len(contexts)
-            print(f"   📎 {len(contexts)} contexts, avg length: {avg_ctx_len:.0f} chars")
 
             data["question"].append(pair["question"])
             data["answer"].append(answer)
@@ -147,32 +124,24 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
         print("❌ No valid data collected for evaluation.")
         return
 
-    # ----------------------------
-    # Debug sample
-    # ----------------------------
-    print("\n🔍 Sample check:")
-    print("Q:", data["question"][0])
-    print("A:", data["answer"][0][:120])
-    # FIX: show all context entries + lengths so empty/short contexts are visible
-    print(f"C: {len(data['contexts'][0])} context chunks")
-    for i, ctx in enumerate(data["contexts"][0]):
-        print(f"   [{i}] ({len(ctx)} chars) {ctx[:80]}...")
-    print("GT:", data["ground_truth"][0])
-
     dataset = Dataset.from_dict(data)
-
-    print("\n🚀 Running RAGAS evaluation...\n")
+    print("\n🚀 Running RAGAS evaluation (using Groq + Local Embeddings)...\n")
 
     # ----------------------------
     # Run Evaluation
     # ----------------------------
     try:
+        # Initialize metrics with Groq LLM
+        faithfulness_m = Faithfulness(llm=llm)
+        answer_relevancy_m = AnswerRelevancy(llm=llm, embeddings=embeddings)
+        context_precision_m = ContextPrecision(llm=llm)
+
         result = evaluate(
             dataset,
             metrics=[
-                Faithfulness(llm=llm),
-                AnswerRelevancy(llm=llm, embeddings=embeddings),
-                ContextPrecision(llm=llm),
+                faithfulness_m,
+                answer_relevancy_m,
+                context_precision_m,
             ]
         )
 
@@ -183,28 +152,24 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
         df = result.to_pandas()
         os.makedirs("eval", exist_ok=True)
         df.to_csv("eval/results.csv", index=False)
-
         print("\n✅ Results saved to eval/results.csv")
 
-        # FIX: print per-metric summary + flag failing questions
-        # This tells you WHICH questions have faithfulness < 0.6 (hallucinations)
-        # and answer_relevancy < 0.6 (off-topic) so you know what to fix next
+        # Summary and bad question tracking
+        available_cols = df.columns.tolist()
         print("\n📊 Per-metric summary:")
         for col in ["faithfulness", "answer_relevancy", "context_precision"]:
-            if col in df.columns:
+            if col in available_cols:
                 mean_val = df[col].mean()
-                nan_count = df[col].isna().sum()
-                print(f"   {col}: mean={mean_val:.3f}  NaN rows={nan_count}")
+                print(f"   {col}: mean={mean_val:.3f}")
 
         print("\n🚨 Questions needing attention (faithfulness < 0.6 or relevancy < 0.6):")
-        if "faithfulness" in df.columns and "answer_relevancy" in df.columns:
-            bad = df[
-                (df["faithfulness"] < 0.6) | (df["answer_relevancy"] < 0.6)
-            ][["question", "faithfulness", "answer_relevancy", "context_precision"]]
+        if all(c in available_cols for c in ["faithfulness", "answer_relevancy", "question"]):
+            bad = df[(df["faithfulness"] < 0.6) | (df["answer_relevancy"] < 0.6)]
             if bad.empty:
                 print("   None — all above threshold ✅")
             else:
-                print(bad.to_string(index=False))
+                cols_to_show = ["question", "faithfulness", "answer_relevancy"]
+                print(bad[cols_to_show].to_string(index=False))
                 bad.to_csv("eval/failing_questions.csv", index=False)
                 print("\n   Saved to eval/failing_questions.csv")
 
@@ -213,9 +178,5 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
         import traceback
         traceback.print_exc()
 
-
-# ----------------------------
-# Run
-# ----------------------------
 if __name__ == "__main__":
     run_eval()

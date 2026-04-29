@@ -54,21 +54,13 @@ def get_qdrant_client():
     global _client
 
     if _client is None:
-        qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
-
-        _client = QdrantClient(
-            url=qdrant_url,
-            timeout=60
-        )
-        
-        # Verify connection immediately
+        # Use local persistent storage on disk. No Docker required!
         try:
-            _client.get_collections()
-        except Exception:
-            print(f"❌ CRITICAL: Could not connect to Qdrant at {qdrant_url}")
-            print("👉 Make sure Qdrant is running (e.g., 'docker-compose up -d qdrant')")
-            _client = None
-            raise ConnectionError(f"Qdrant offline at {qdrant_url}")
+            _client = QdrantClient(path="qdrant_data")
+            print("📦 Qdrant connected (Local Mode: qdrant_data/)")
+        except Exception as e:
+            print(f"❌ CRITICAL: Could not initialize local Qdrant: {e}")
+            raise e
 
     return _client
 

@@ -1,9 +1,0 @@
-venv/
-__pycache__/
-.git/
-.env
-.vs/
-qdrant_data/
-*.pdf
-eval/
-data/raw/*.pdf

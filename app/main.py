@@ -44,6 +44,12 @@ bm25_index, all_chunks = None, []
 async def startup():
     global bm25_index, all_chunks
 
+    # Ensure NLTK data is downloaded
+    import nltk
+    print("⏳ Downloading NLTK resources...")
+    nltk.download("punkt", quiet=True)
+    nltk.download("punkt_tab", quiet=True)
+
     client = get_qdrant_client()
 
     if not client.collection_exists(COLLECTION):
