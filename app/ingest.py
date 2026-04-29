@@ -20,8 +20,8 @@ COLLECTION = "gate_docs"
 # ----------------------------
 # CHUNK CONFIG
 # ----------------------------
-CHUNK_SENTENCES = 6
-OVERLAP_SENTENCES = 2
+CHUNK_SENTENCES = 12
+OVERLAP_SENTENCES = 3
 
 
 # ----------------------------
@@ -124,30 +124,13 @@ def ingest_text(text: str, source_name: str):
     batch_size = 64 if device == "cpu" else 128
     
     print(f"🧠 Generating embeddings...")
-    if device == "cpu":
-        # Multi-process encoding for CPU is much faster for large numbers of chunks
-        print(f"🔥 Initializing multi-process pool (this may take 30-60s on Windows)...")
-        import time
-        start_time = time.time()
-        
-        pool = embedder.start_multi_process_pool()
-        
-        print(f"✅ Pool initialized in {time.time() - start_time:.2f}s. Starting encoding...")
-        
-        embeddings = embedder.encode_multi_process(
-            chunks,
-            pool,
-            batch_size=batch_size
-        )
-        embedder.stop_multi_process_pool(pool)
-    else:
-        # Standard GPU encoding
-        embeddings = embedder.encode(
-            chunks,
-            batch_size=batch_size,
-            show_progress_bar=True,
-            convert_to_numpy=True
-        )
+    # Standard stable encoding (multi-process is unstable in Docker/Windows)
+    embeddings = embedder.encode(
+        chunks,
+        batch_size=batch_size,
+        show_progress_bar=True,
+        convert_to_numpy=True
+    )
 
     # Prepare points for Qdrant
     print(f"📤 Uploading to Qdrant...")
