@@ -201,6 +201,7 @@ def bm25_search(query: str, top_k: int = 10):
 def reciprocal_rank_fusion(dense_results, bm25_results, k=60):
     scores = {}
 
+    # Give BM25 (keyword search) a slight boost for numerical/year queries
     for rank, r in enumerate(dense_results):
         key = r["text"]
         scores.setdefault(key, {"text": r["text"], "source": r["source"], "rrf": 0})
@@ -209,7 +210,8 @@ def reciprocal_rank_fusion(dense_results, bm25_results, k=60):
     for rank, r in enumerate(bm25_results):
         key = r["text"]
         scores.setdefault(key, {"text": r["text"], "source": r["source"], "rrf": 0})
-        scores[key]["rrf"] += 1 / (k + rank + 1)
+        # Keyword match is critical for GATE/JEE (Years, constants)
+        scores[key]["rrf"] += 1.2 / (k + rank + 1)
 
     return sorted(scores.values(), key=lambda x: x["rrf"], reverse=True)
 
