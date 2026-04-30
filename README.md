@@ -1,57 +1,84 @@
-# 📚 Hindi-GATE Tutor: Multilingual RAG Assistant
+---
+title: Hindi-GATE-Tutor
+emoji: 🎓
+colorFrom: blue
+colorTo: indigo
+sdk: streamlit
+sdk_version: 1.32.2
+python_version: 3.11
+app_file: app.py
+pinned: false
+---
 
-An AI-powered tutoring system designed for GATE/JEE preparation. This application uses a **Retrieval-Augmented Generation (RAG)** pipeline to provide grounded, context-aware answers from technical textbooks in both English and Hindi.
+# 🎓 Hindi-GATE Tutor
 
-## 🚀 Technical Features
-- **Hybrid Retrieval:** Combines semantic search (Dense) with keyword matching (BM25) for high-precision retrieval.
-- **Advanced Reranking:** Utilizes a Cross-Encoder to re-score candidates, ensuring the most relevant context is fed to the LLM.
-- **Conversational Memory:** Maintains context through multi-turn dialogues with LLM-driven **Query Rewriting**.
-- **Optimized Ingestion:** High-speed processing using **multi-process CPU encoding** and **parallel Qdrant uploads**.
-- **Startup Pre-loading:** Models are pre-cached and loaded at server startup for zero-latency first queries.
-- **Dynamic Library:** Manage your knowledge base with the ability to ingest or delete specific documents.
+[![Open in Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-deploy-button.svg)](https://huggingface.co/spaces/arushi1092/Hindi-GATE-Tutor)
 
-## 🧠 Tech Stack
-- **Backend:** FastAPI (Asynchronous Python)
-- **Frontend:** Streamlit
-- **Vector DB:** Qdrant (with INT8 Quantization)
-- **LLM:** Llama-3 (via Groq Cloud)
-- **Embeddings:** `paraphrase-multilingual-MiniLM-L12-v2` (Fast, Multilingual)
-- **Search Logic:** Rank-BM25 + RRF (Reciprocal Rank Fusion)
+An AI-powered **multilingual (Hindi + English) tutor** for GATE and JEE preparation using a **Retrieval-Augmented Generation (RAG)** pipeline.
 
-## 🛠️ Installation & Setup
-
-### Option 1: Docker (Recommended)
-This is the easiest way to run the full stack including the Qdrant vector database.
-
-1. Ensure you have Docker and Docker Compose installed.
-2. Create a `.env` file with your API keys:
-   ```env
-   GROQ_API_KEY=your_key_here
-   OPENAI_API_KEY=your_key_here
-   ```
-3. Run with Docker Compose:
-   ```bash
-   docker-compose up --build
-   ```
-4. Access the UI at `http://localhost:8501` and the API at `http://localhost:8000`.
-
-### Option 2: Local Setup
-1. Prerequisites: Python 3.10+, Groq API Key.
-2. Setup Environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: .\venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
-3. Run the Application (Two terminals):
-   - **Backend:** `uvicorn app.main:app --reload`
-   - **Frontend:** `streamlit run app_ui.py`
-
-## 📸 Project Structure
-- `app/`: Core logic (Ingestion, Retrieval, Generation)
-- `app_ui.py`: Streamlit dashboard
-- `data/raw/`: Storage for source PDFs
-- `qdrant_data/`: Local vector database (Git ignored)
+This system allows students to upload study material and get **conceptual, context-aware explanations** in their preferred language.
 
 ---
-*Developed for technical academic assistance and competitive exam preparation.*
+
+## 🚀 Features
+
+* 📄 Upload PDFs (GATE papers, textbooks, notes)
+* 🌐 Hindi + English query support
+* 🔍 Hybrid retrieval (Dense embeddings + BM25)
+* 🧠 Semantic understanding using sentence-transformers
+* 🤖 LLM-powered explanations (Groq - Llama 3.3 70B)
+* 📊 Context-aware and step-by-step answers
+
+---
+
+## 🏗️ Tech Stack
+
+* **Frontend:** Streamlit
+* **LLM:** Llama 3.3 70B (via Groq)
+* **Vector DB:** Qdrant (local persistent storage)
+* **Embeddings:** Sentence Transformers
+* **Search:** Hybrid (Vector + BM25)
+* **Parsing:** PyMuPDF
+
+---
+
+## ⚙️ How to Use
+
+1. Open the app
+2. Upload your syllabus / notes PDF
+3. Wait for indexing
+4. Ask questions in Hindi or English
+5. Get structured explanations
+
+---
+
+## 🧠 How It Works
+
+1. Documents are split into chunks
+2. Each chunk is converted into embeddings
+3. Stored in Qdrant vector database
+4. Hybrid retrieval fetches relevant chunks
+5. LLM generates answers based on retrieved context
+
+---
+
+## ⚠️ Limitations
+
+* Answers depend on quality of uploaded documents
+* Large PDFs may increase latency
+* Requires API key for Groq
+
+---
+
+## 🔮 Future Improvements
+
+* Better chunking strategy
+* Answer evaluation (RAGAS)
+* UI enhancements
+* Multi-document comparison
+
+---
+
+## 👩‍💻 Author
+
+Built to help students learn concepts more effectively in their preferred language ❤️
