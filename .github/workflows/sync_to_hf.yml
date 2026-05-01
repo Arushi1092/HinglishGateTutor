@@ -16,4 +16,4 @@ jobs:
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push --force https://arushi1092:$HF_TOKEN@huggingface.co/spaces/arushi1092/Hindi-GATE-Tutor main
+        run: git push --force https://arushi1092:$HF_TOKEN@huggingface.co/spaces/arushi1092/HindiEnglish_GATEJEE_Tutor main
