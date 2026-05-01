@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import List, Dict
 from dotenv import load_dotenv
-from groq import Groq
+from groq import AsyncGroq
 
 # ----------------------------
 # Load API key
@@ -14,7 +14,7 @@ api_key = os.getenv("GROQ_API_KEY")
 if not api_key:
     raise ValueError("GROQ_API_KEY not found in .env")
 
-client = Groq(api_key=api_key)
+client = AsyncGroq(api_key=api_key)
 
 # ----------------------------
 # Prompts
@@ -56,10 +56,29 @@ History:
 Follow-up Question: {query}
 Standalone Search Query:"""
 
+HYDE_PROMPT = """Write a 3-sentence technical textbook answer to the following question.
+Focus on being factual and providing core details that would likely appear in a textbook.
+
+Question: {query}
+Hypothetical Answer:"""
+
 # ----------------------------
 # Helpers
 # ----------------------------
-def rewrite_query(query: str, history: List[Dict]) -> str:
+async def generate_hypothetical_answer(query: str) -> str:
+    try:
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": HYDE_PROMPT.format(query=query)}],
+            max_tokens=150,
+            temperature=0
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"HyDE Generation Error: {e}")
+        return query
+
+async def rewrite_query(query: str, history: List[Dict]) -> str:
     if not history:
         return query
 
@@ -69,7 +88,7 @@ def rewrite_query(query: str, history: List[Dict]) -> str:
         history_text += f"Q: {h.get('q','')}\nA: {h.get('a','')}\n"
     
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": REWRITE_PROMPT.format(history=history_text, query=query)}],
             max_tokens=100,
@@ -90,7 +109,7 @@ def build_context(chunks: List[Dict], max_chunks: int = 10):
 # ----------------------------
 # Main function
 # ----------------------------
-def generate_answer(query: str, chunks: List[Dict], lang: str = "en", history: List[Dict] = None):
+async def generate_answer(query: str, chunks: List[Dict], lang: str = "en", history: List[Dict] = None):
     if history is None:
         history = []
 
@@ -120,7 +139,7 @@ def generate_answer(query: str, chunks: List[Dict], lang: str = "en", history: L
     user_prompt += f"### Current Question: {query}"
 
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=500,
             temperature=0.1,

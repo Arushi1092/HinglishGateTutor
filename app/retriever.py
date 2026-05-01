@@ -126,13 +126,15 @@ def get_all_chunks():
 # ----------------------------
 # Dense Search
 # ----------------------------
-def dense_search(query: str, top_k: int = 5):
+def dense_search(query: str, top_k: int = 5, query_to_embed: str = None):
     client = get_qdrant_client()
     if not client.collection_exists(COLLECTION):
         return []
 
     embedder = get_embedder()
-    query_vec = embedder.encode(query).tolist()
+    # If query_to_embed is provided (e.g. HyDE), use it for the vector search
+    text_to_embed = query_to_embed if query_to_embed else query
+    query_vec = embedder.encode(text_to_embed).tolist()
 
     results = client.query_points(
         collection_name=COLLECTION,
@@ -243,10 +245,11 @@ def rerank(query: str, candidates: list[dict], top_k: int = 5):
 # ----------------------------
 # Hybrid Search
 # ----------------------------
-def hybrid_search(query: str, top_k: int = 5):
+def hybrid_search(query: str, top_k: int = 5, hypothetical_answer: str = None):
     q_info = prepare_query(query)
 
-    dense = dense_search(q_info["original"], top_k=20)
+    # Use HyDE if hypothetical_answer is provided
+    dense = dense_search(q_info["original"], top_k=20, query_to_embed=hypothetical_answer)
     sparse = bm25_search(q_info["original"], top_k=20)
 
     fused = reciprocal_rank_fusion(dense, sparse)

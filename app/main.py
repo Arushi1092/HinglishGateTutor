@@ -1,19 +1,27 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from pydantic import BaseModel
 import shutil, tempfile, os
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 from app.ingest import ingest_pdf, ingest_text, create_collection
 from app.retriever import hybrid_search, build_bm25_index, prepare_query, get_qdrant_client, COLLECTION, already_ingested
-from app.generator import generate_answer, rewrite_query
+from app.generator import generate_answer, rewrite_query, generate_hypothetical_answer
 from app.wiki import fetch_wikipedia_content
 import json
 
 app = FastAPI(title="Hindi-GATE Tutor", version="1.0")
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 GOLDEN_DATA_PATH = "data/golden_qa.json"
 
 # ── EVALUATION HELPERS ────────────────────────────────
-def judge_response(question, golden, generated, sources):
+async def judge_response(question, golden, generated, sources):
     from app.generator import client
     prompt = f"""
     Compare the Generated Answer against the Golden Answer for the Question.
@@ -25,8 +33,8 @@ def judge_response(question, golden, generated, sources):
     Return JSON: {{"accuracy": score_1_to_5, "reasoning": "why"}}
     """
     try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0
@@ -70,7 +78,8 @@ async def startup():
 
 # ── POST /ingest ──────────────────────────────────────
 @app.post("/ingest")
-async def ingest(file: UploadFile = File(...)):
+@limiter.limit("5/minute")
+async def ingest(request: Request, file: UploadFile = File(...)):
     
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only PDF files accepted")
@@ -111,7 +120,8 @@ class WikiRequest(BaseModel):
 
 
 @app.post("/wiki")
-async def ingest_wiki(req: WikiRequest):
+@limiter.limit("5/minute")
+async def ingest_wiki(request: Request, req: WikiRequest):
     source_name = f"wiki:{req.title}"
     
     if already_ingested(source_name):
@@ -147,13 +157,15 @@ class AskRequest(BaseModel):
     question: str
     top_k: int = 5
     history: list = []
+    use_hyde: bool = False
 
 
 @app.post("/ask")
-async def ask(req: AskRequest):
+@limiter.limit("10/minute")
+async def ask(request: Request, req: AskRequest):
     
     # 1. Rewrite query using history (better approach)
-    search_query = rewrite_query(req.question, req.history)
+    search_query = await rewrite_query(req.question, req.history)
 
     if search_query != req.question:
         print(f"🔄 Rewritten (LLM): {req.question} -> {search_query}")
@@ -161,8 +173,14 @@ async def ask(req: AskRequest):
     # 2. Language detection
     q_info = prepare_query(req.question)
 
-    # 3. Retrieval using rewritten query
-    chunks = hybrid_search(search_query, top_k=req.top_k)
+    # 3. HyDE (Hypothetical Document Embedding)
+    hypothetical_answer = None
+    if req.use_hyde:
+        print(f"🧠 Generating hypothetical answer for HyDE...")
+        hypothetical_answer = await generate_hypothetical_answer(search_query)
+
+    # 4. Retrieval using rewritten query (and optional HyDE)
+    chunks = hybrid_search(search_query, top_k=req.top_k, hypothetical_answer=hypothetical_answer)
 
     if not chunks:
         raise HTTPException(
@@ -173,11 +191,7 @@ async def ask(req: AskRequest):
     print(f"🔍 Retrieved {len(chunks)} chunks")
 
     # 4. Generate answer with history
-    # FIX (faithfulness NaN + relevancy lock): generator must be told to answer
-    # ONLY from the retrieved chunks. Ensure your generate_answer() system prompt
-    # contains: "Answer ONLY based on the context provided. Do not add any
-    # information not present in the context. If unsure, say so in Hindi."
-    answer = generate_answer(
+    answer = await generate_answer(
         req.question,
         chunks,
         q_info["lang"],
@@ -192,7 +206,7 @@ async def ask(req: AskRequest):
                 golden_data = json.load(f)
                 for item in golden_data:
                     if item["question"].lower().strip() == req.question.lower().strip():
-                        eval_result = judge_response(
+                        eval_result = await judge_response(
                             req.question, 
                             item["golden_answer"], 
                             answer, 

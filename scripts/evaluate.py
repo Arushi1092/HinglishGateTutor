@@ -40,7 +40,7 @@ Output ONLY a JSON object with this structure:
 def get_judge_score(question, golden, generated, sources) -> Dict:
     try:
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": JUDGE_PROMPT.format(
                 question=question,
                 golden_answer=golden,

@@ -35,8 +35,8 @@ groq_api_key = os.getenv("GROQ_API_KEY")
 if not groq_api_key:
     raise ValueError("❌ GROQ_API_KEY not found in .env. Evaluation requires an LLM (OpenAI or Groq).")
 
-print("⏳ Initializing Groq (Llama-3.1-70b) for evaluation...")
-langchain_llm = ChatGroq(model="llama-3.1-70b-versatile", groq_api_key=groq_api_key)
+print("⏳ Initializing Groq (Llama-3-8b) for evaluation...")
+langchain_llm = ChatGroq(model="llama-3-8b-8192", groq_api_key=groq_api_key)
 llm = LangchainLLMWrapper(langchain_llm)
 
 # Use a local multilingual model for RAGAS embeddings (FREE & Fast)
@@ -47,7 +47,7 @@ embeddings = LangchainEmbeddingsWrapper(langchain_embeddings)
 # ----------------------------
 # Main Evaluation Function
 # ----------------------------
-def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
+def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10, use_hyde: bool = False):
 
     if not os.path.exists(qa_file):
         print(f"❌ File not found: {qa_file}")
@@ -65,7 +65,7 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
 
     # Sample a few pairs for evaluation
     selected_pairs = pairs[::sample_step]
-    print(f"🚀 Starting evaluation on {len(selected_pairs)} samples...\n")
+    print(f"🚀 Starting evaluation on {len(selected_pairs)} samples (HyDE: {use_hyde})...\n")
 
     # ----------------------------
     # Fetch responses from your API
@@ -80,6 +80,7 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
                     "question": pair["question"],
                     "history": [],
                     "top_k": 5,
+                    "use_hyde": use_hyde
                 },
                 timeout=120,
             )
@@ -136,13 +137,17 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
         answer_relevancy_m = AnswerRelevancy(llm=llm, embeddings=embeddings)
         context_precision_m = ContextPrecision(llm=llm)
 
+        from ragas import RunConfig
+        config = RunConfig(max_workers=2) # Slow but steady to avoid Groq rate limits
+
         result = evaluate(
             dataset,
             metrics=[
                 faithfulness_m,
                 answer_relevancy_m,
                 context_precision_m,
-            ]
+            ],
+            run_config=config
         )
 
         print("📊 RAGAS Results:")
@@ -179,4 +184,12 @@ def run_eval(qa_file: str = "data/golden_qa.json", sample_step: int = 10):
         traceback.print_exc()
 
 if __name__ == "__main__":
-    run_eval()
+    import argparse
+    parser = argparse.ArgumentParser(description="Run RAGAS evaluation on the Hindi-GATE Tutor.")
+    parser.add_argument("--hyde", action="store_true", help="Use HyDE for retrieval during evaluation.")
+    parser.add_argument("--sample_step", type=int, default=10, help="Sample every Nth question from the golden dataset.")
+    parser.add_argument("--qa_file", type=str, default="data/golden_qa.json", help="Path to the golden QA dataset.")
+    
+    args = parser.parse_args()
+    
+    run_eval(qa_file=args.qa_file, sample_step=args.sample_step, use_hyde=args.hyde)
