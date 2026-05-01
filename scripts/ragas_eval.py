@@ -35,8 +35,13 @@ groq_api_key = os.getenv("GROQ_API_KEY")
 if not groq_api_key:
     raise ValueError("❌ GROQ_API_KEY not found in .env. Evaluation requires an LLM (OpenAI or Groq).")
 
-print("⏳ Initializing Groq (Llama-3-8b) for evaluation...")
-langchain_llm = ChatGroq(model="llama-3-8b-8192", groq_api_key=groq_api_key)
+print("⏳ Initializing Groq (Llama-3.3-70b-versatile) for evaluation...")
+# We enforce n=1 because Groq does not support multiple completions per request
+langchain_llm = ChatGroq(
+    model="llama-3.3-70b-versatile", 
+    groq_api_key=groq_api_key,
+    model_kwargs={"n": 1} 
+)
 llm = LangchainLLMWrapper(langchain_llm)
 
 # Use a local multilingual model for RAGAS embeddings (FREE & Fast)
